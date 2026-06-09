@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Studio — Enclosed Car Hauler Trailer 01</title>
+  <style>
+    :root {
+      --bg-top: #2a2d33;
+      --bg-bottom: #0c0d10;
+      --accent: #ff5c2b;
+      --text: #e9eaec;
+      --muted: #8b8e96;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #0c0d10;
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    #app { position: fixed; inset: 0; }
+    canvas { display: block; touch-action: none; }
+
+    /* ---------- Loading overlay ---------- */
+    #loader {
+      position: fixed; inset: 0; z-index: 50;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: radial-gradient(circle at 50% 40%, #1a1c21 0%, #0c0d10 70%);
+      transition: opacity 0.8s ease;
+    }
+    #loader.hidden { opacity: 0; pointer-events: none; }
+    .loader-title {
+      font-size: 13px; letter-spacing: 0.35em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 22px;
+    }
+    .bar { width: 240px; height: 2px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+    .bar > i { display: block; height: 100%; width: 0%; background: var(--accent); transition: width 0.25s ease; }
+    .loader-pct { margin-top: 14px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+    /* ---------- HUD ---------- */
+    .hud { position: fixed; z-index: 20; pointer-events: none; }
+    .hud * { pointer-events: auto; }
+
+    .topbar {
+      top: 0; left: 0; right: 0;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 26px 34px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 14px var(--accent); }
+    .brand .name { font-size: 13px; letter-spacing: 0.28em; text-transform: uppercase; }
+    .meta { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); text-align: right; }
+
+    .titleblock { position: fixed; left: 34px; bottom: 34px; z-index: 20; max-width: 60vw; }
+    .titleblock .eyebrow { font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+    .titleblock h1 { font-size: clamp(26px, 4vw, 52px); font-weight: 600; line-height: 1.05; letter-spacing: -0.01em; }
+    .titleblock p { margin-top: 12px; font-size: 13px; color: var(--muted); max-width: 420px; line-height: 1.6; }
+
+    /* ---------- Controls ---------- */
+    .controls {
+      position: fixed; right: 34px; bottom: 34px; z-index: 20;
+      display: flex; gap: 10px; align-items: center;
+    }
+    .btn {
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      backdrop-filter: blur(8px);
+      font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
+      padding: 11px 16px; border-radius: 999px; cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex; align-items: center; gap: 8px;
+    }
+    .btn:hover { border-color: var(--accent); color: #fff; background: rgba(255,92,43,0.12); }
+    .btn.active { border-color: var(--accent); color: var(--accent); }
+    .btn svg { width: 12px; height: 12px; }
+
+    .hint {
+      position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
+      z-index: 15; font-size: 11px; letter-spacing: 0.14em; color: var(--muted);
+      text-transform: uppercase; opacity: 0.7;
+      transition: opacity 0.4s ease;
+    }
+    .hint.gone { opacity: 0; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- Loading -->
+  <div id="loader">
+    <div class="loader-title">Loading Studio</div>
+    <div class="bar"><i id="bar"></i></div>
+    <div class="loader-pct" id="pct">0%</div>
+  </div>
+
+  <!-- HUD -->
+  <div class="hud topbar">
+    <div class="brand">
+      <span class="dot"></span>
+      <span class="name">3D Studio</span>
+    </div>
+    <div class="meta">FBX · PBR · WebGL</div>
+  </div>
+
+  <div class="titleblock">
+    <div class="eyebrow">Showcase</div>
+    <h1>Enclosed Car<br/>Hauler Trailer 01</h1>
+    <p>Real-time studio presentation with an automated cinematic camera orbit. Drag to inspect — release to resume the flythrough.</p>
+  </div>
+
+  <div class="controls">
+    <button class="btn active" id="btn-orbit">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="6"/></svg>
+      <span id="orbit-label">Pause orbit</span>
+    </button>
+    <button class="btn" id="btn-doors">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="1"/><path d="M12 4v16"/></svg>
+      <span id="doors-label">Open &amp; unload</span>
+    </button>
+    <button class="btn" id="btn-reset">Reset view</button>
+  </div>
+
+  <div class="hint" id="hint">Drag to rotate · Scroll to zoom</div>
+
+  <!-- Three.js + GSAP via ESM CDN -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+      "gsap": "https://cdn.jsdelivr.net/npm/gsap@3.12.5/index.js"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+    import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+    import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
+    import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+    import { DecalGeometry } from 'three/addons/geometries/DecalGeometry.js';
+    import gsap from 'gsap';
+
+    const app = document.getElementById('app');
+
+    // ---------- Renderer ----------
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    app.appendChild(renderer.domElement);
+
+    // ---------- Scene ----------
+    const scene = new THREE.Scene();
+
+    // Studio backdrop: vertical gradient via large sphere
+    const bgGeo = new THREE.SphereGeometry(500, 32, 32);
+    const bgMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      uniforms: {
+        top: { value: new THREE.Color('#3a3e46') },
+        bottom: { value: new THREE.Color('#0a0b0e') },
+        offset: { value: 120 },
+        exponent: { value: 0.85 }
+      },
+      vertexShader: `
+        varying vec3 vWorld;
+        void main(){ vec4 wp = modelMatrix * vec4(position,1.0); vWorld = wp.xyz; gl_Position = projectionMatrix * viewMatrix * wp; }
+      `,
+      fragmentShader: `
+        uniform vec3 top; uniform vec3 bottom; uniform float offset; uniform float exponent;
+        varying vec3 vWorld;
+        void main(){ float h = normalize(vWorld + vec3(0.0, offset, 0.0)).y; float t = pow(max(h,0.0), exponent); gl_FragColor = vec4(mix(bottom, top, t), 1.0); }
+      `,
+      depthWrite: false
+    });
+    scene.add(new THREE.Mesh(bgGeo, bgMat));
+
+    // Environment for PBR reflections
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+    // ---------- Camera ----------
+    const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 5000);
+    camera.position.set(6, 4, 9);
+
+    // ---------- Controls ----------
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.minDistance = 2;
+    controls.maxDistance = 60;
+    controls.maxPolarAngle = Math.PI * 0.52; // don't go under the floor
+
+    // ---------- Lights (studio 3-point) ----------
+    const key = new THREE.DirectionalLight(0xffffff, 2.4);
+    key.position.set(8, 12, 6);
+    key.castShadow = true;
+    key.shadow.mapSize.set(2048, 2048);
+    key.shadow.bias = -0.0002;
+    const sCam = key.shadow.camera;
+    sCam.near = 0.5; sCam.far = 80; sCam.left = -20; sCam.right = 20; sCam.top = 20; sCam.bottom = -20;
+    scene.add(key);
+
+    const fill = new THREE.DirectionalLight(0xbcd3ff, 0.7);
+    fill.position.set(-10, 6, -4);
+    scene.add(fill);
+
+    const rim = new THREE.DirectionalLight(0xffd9b0, 1.1);
+    rim.position.set(-4, 8, -10);
+    scene.add(rim);
+
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x33363d, 0.35));
+
+    // ---------- Ground (shadow catcher) ----------
+    const ground = new THREE.Mesh(
+      new THREE.CircleGeometry(60, 64),
+      new THREE.ShadowMaterial({ opacity: 0.42 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // Subtle reflective studio floor disc under the shadow
+    const floor = new THREE.Mesh(
+      new THREE.CircleGeometry(60, 64),
+      new THREE.MeshStandardMaterial({ color: 0x15171b, roughness: 0.55, metalness: 0.2 })
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = -0.002;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    // ---------- Load model ----------
+    const loaderEl = document.getElementById('loader');
+    const barEl = document.getElementById('bar');
+    const pctEl = document.getElementById('pct');
+
+    const manager = new THREE.LoadingManager();
+    manager.onProgress = (url, loaded, total) => {
+      const p = total ? Math.round((loaded / total) * 100) : 0;
+      barEl.style.width = p + '%';
+      pctEl.textContent = p + '%';
+    };
+
+    const fbxLoader = new FBXLoader(manager);
+    fbxLoader.setResourcePath('assets/map/'); // textures resolve by basename here
+
+    let modelCenter = new THREE.Vector3();
+    let fitRadius = 8;
+
+    // Detail textures (Metal / Tire) — the FBX ships VRay materials that
+    // FBXLoader can't translate, so we re-build PBR materials by name.
+    const texLoader = new THREE.TextureLoader(manager).setPath('assets/map/');
+    function loadTex(name, srgb) {
+      const t = texLoader.load(name);
+      t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      return t;
+    }
+    const metalTex = loadTex('Metal.png', true);
+    const tireTex = loadTex('Tire2.png', true);
+
+    // ---------- Placeholder logo (canvas wordmark) ----------
+    function makeLogoTexture() {
+      const w = 1024, h = 384;
+      const cv = document.createElement('canvas');
+      cv.width = w; cv.height = h;
+      const ctx = cv.getContext('2d');
+      ctx.clearRect(0, 0, w, h);
+
+      // Emblem: chevron mark
+      ctx.fillStyle = '#ff5c2b';
+      ctx.beginPath();
+      ctx.moveTo(140, 70); ctx.lineTo(250, 70); ctx.lineTo(180, 192); ctx.lineTo(70, 192); ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(250, 70); ctx.lineTo(360, 70); ctx.lineTo(290, 192); ctx.lineTo(180, 192); ctx.closePath();
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+
+      // Wordmark
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 130px Inter, Arial, sans-serif';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillText('VELOCITY', 70, 320);
+      // Tagline
+      ctx.fillStyle = '#ff5c2b';
+      ctx.font = '600 46px Inter, Arial, sans-serif';
+      ctx.fillText('M O T O R S P O R T   T R A I L E R S', 74, 372);
+
+      const tex = new THREE.CanvasTexture(cv);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      return tex;
+    }
+    const logoTex = makeLogoTexture();
+
+    function buildMaterial(src) {
+      const n = (src.name || '').toLowerCase();
+      const std = new THREE.MeshPhysicalMaterial({ name: src.name });
+      if (src.color) std.color.copy(src.color);
+      std.envMapIntensity = 1.15;
+
+      if (n.includes('metal')) {
+        std.map = metalTex;
+        std.color.set('#ffffff');
+        std.metalness = 0.95;
+        std.roughness = 0.42;
+      } else if (n.includes('tire')) {
+        std.map = tireTex;
+        std.color.set('#dddddd');
+        std.metalness = 0.0;
+        std.roughness = 0.85;
+      } else if (n.includes('carpaint')) {
+        // Sleek studio black automotive paint
+        std.color.set('#0e0f12');
+        std.metalness = 0.55;
+        std.roughness = 0.28;
+        std.clearcoat = 1.0;
+        std.clearcoatRoughness = 0.14;
+      } else if (n.includes('red')) {
+        std.metalness = 0.25;
+        std.roughness = 0.4;
+        std.clearcoat = 0.6;
+      } else if (n.includes('plastic')) {
+        if (std.color.getHex() < 0x101010) std.color.set('#15161a');
+        std.metalness = 0.0;
+        std.roughness = 0.62;
+      } else {
+        // Base_* structural parts: lift pure-black a touch so detail reads
+        if (std.color.getHex() < 0x0c0c0c) std.color.set('#16171b');
+        std.metalness = 0.3;
+        std.roughness = 0.55;
+      }
+      return std;
+    }
+
+    let shellMesh = null, partitionMesh = null;
+    fbxLoader.load('assets/trailer.fbx', (object) => {
+      object.traverse((c) => {
+        if (c.isMesh) {
+          c.castShadow = true;
+          c.receiveShadow = true;
+          if (c.name === 'Base_01') shellMesh = c;   // full outer body for decal projection
+          if (c.name === 'Base_02') partitionMesh = c; // interior partition blocking the exit path
+          if (Array.isArray(c.material)) {
+            c.material = c.material.map(buildMaterial);
+          } else if (c.material) {
+            c.material = buildMaterial(c.material);
+          }
+        }
+      });
+
+      // Compute bounds, then scale to a comfortable studio size (~6 units tall)
+      let box = new THREE.Box3().setFromObject(object);
+      let size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z) || 1;
+      const targetSize = 6;
+      const scale = targetSize / maxDim;
+      object.scale.setScalar(scale);
+
+      // Recompute after scaling, drop onto floor, center horizontally
+      box = new THREE.Box3().setFromObject(object);
+      const center = box.getCenter(new THREE.Vector3());
+      object.position.x -= center.x;
+      object.position.z -= center.z;
+      object.position.y -= box.min.y;
+
+      scene.add(object);
+      window.__model = object; window.__THREE = THREE;
+
+      box = new THREE.Box3().setFromObject(object);
+      box.getCenter(modelCenter);
+      const sphere = box.getBoundingSphere(new THREE.Sphere());
+      fitRadius = sphere.radius;
+
+      // Orbit target = model center
+      controls.target.copy(modelCenter);
+      controls.update();
+
+      buildRearDoors(box);
+      addLogoDecal();
+      loadCar(box);
+
+      setupCameraIntro();
+
+      // hide loader
+      loaderEl.classList.add('hidden');
+      setTimeout(() => loaderEl.remove(), 900);
+    }, undefined, (err) => {
+      pctEl.textContent = 'Failed to load model';
+      console.error(err);
+    });
+
+    // ---------- Rear doors (built geometry — model ships no separate door mesh) ----------
+    let leftPivot = null, rightPivot = null, interiorLight = null;
+    const OPEN_ANGLE = 1.95;           // ~112°
+    const REAR_SIGN = 1;               // +X end is the rear (the narrow tongue/hitch is on -X)
+
+    function doorMaterial() {
+      return new THREE.MeshPhysicalMaterial({
+        color: 0x0e0f12, metalness: 0.55, roughness: 0.3,
+        clearcoat: 1.0, clearcoatRoughness: 0.16, envMapIntensity: 1.15
+      });
+    }
+
+    function buildRearDoors(box) {
+      const range = box.max.y - box.min.y;
+      // Sit just inside the rear edge of the cargo box and fill the whole opening.
+      const rearX = (REAR_SIGN > 0 ? box.max.x - 0.04 : box.min.x + 0.04);
+      const zMax = box.max.z * 0.965;                 // ~full width
+      const yBottom = box.min.y + range * 0.07;
+      const yTop = box.min.y + range * 0.985;
+      const doorH = yTop - yBottom;
+      const yMid = (yTop + yBottom) / 2;
+      const gap = 0.02;
+      const doorWidth = zMax - gap * 2;               // along Z, per door
+      const thickness = 0.05;
+
+      const geo = new THREE.BoxGeometry(thickness, doorH, doorWidth);
+
+      // Right door — hinge at z = -zMax, opens toward +X (outward)
+      rightPivot = new THREE.Object3D();
+      rightPivot.position.set(rearX, yMid, -zMax);
+      const rDoor = new THREE.Mesh(geo, doorMaterial());
+      rDoor.castShadow = true; rDoor.receiveShadow = true;
+      rDoor.position.set(0, 0, gap + doorWidth / 2);
+      rightPivot.add(rDoor);
+
+      // Left door — hinge at z = +zMax
+      leftPivot = new THREE.Object3D();
+      leftPivot.position.set(rearX, yMid, zMax);
+      const lDoor = new THREE.Mesh(geo, doorMaterial());
+      lDoor.castShadow = true; lDoor.receiveShadow = true;
+      lDoor.position.set(0, 0, -(gap + doorWidth / 2));
+      leftPivot.add(lDoor);
+
+      scene.add(rightPivot, leftPivot);
+      window.__doors = { leftPivot, rightPivot };
+
+      // Logo decal on the right rear door (visible when closed)
+      const doorLogo = logoTex.clone();
+      doorLogo.needsUpdate = true;
+      const logoMat = new THREE.MeshPhysicalMaterial({
+        map: doorLogo, transparent: true, depthWrite: false,
+        polygonOffset: true, polygonOffsetFactor: -4, roughness: 0.35, metalness: 0.0
+      });
+      const logoPlane = new THREE.Mesh(new THREE.PlaneGeometry(doorWidth * 0.8, doorWidth * 0.8 * (384 / 1024)), logoMat);
+      // face outward along +X (rear), upright
+      logoPlane.rotation.y = REAR_SIGN > 0 ? Math.PI / 2 : -Math.PI / 2;
+      logoPlane.position.set(REAR_SIGN * (thickness / 2 + 0.002), doorH * 0.12, gap + doorWidth / 2);
+      rDoor.add(logoPlane);
+
+      // Interior light, off until doors open
+      interiorLight = new THREE.PointLight(0xfff0dd, 0, 8, 2);
+      interiorLight.position.set(rearX - REAR_SIGN * 1.6, yMid, 0);
+      scene.add(interiorLight);
+    }
+
+    // ---------- Logo decal on the side body ----------
+    function addLogoDecal() {
+      if (!shellMesh) return;
+      const box = new THREE.Box3().setFromObject(shellMesh);
+      const sideZ = box.max.z;                 // +Z flank
+      const pos = new THREE.Vector3((box.min.x + box.max.x) / 2 - 0.5, box.min.y + (box.max.y - box.min.y) * 0.58, sideZ + 0.02);
+      const orientation = new THREE.Euler(0, 0, 0); // project along -Z onto the +Z wall, visible from +Z
+      const size = new THREE.Vector3(2.0, 2.0 * (384 / 1024), 0.8);
+
+      const decalGeo = new DecalGeometry(shellMesh, pos, orientation, size);
+      const sideLogo = logoTex.clone(); sideLogo.needsUpdate = true;
+      const decalMat = new THREE.MeshPhysicalMaterial({
+        map: sideLogo, transparent: true, depthTest: true, depthWrite: false,
+        polygonOffset: true, polygonOffsetFactor: -4, roughness: 0.4, metalness: 0.0, clearcoat: 0.5
+      });
+      const decal = new THREE.Mesh(decalGeo, decalMat);
+      scene.add(decal);
+      window.__decal = decal;
+    }
+
+    // ---------- Car (loads inside the trailer, drives out on "Open") ----------
+    // The shipped FBX is v6100 (unsupported by three's FBXLoader), so we use the OBJ.
+    let carGroup = null;
+    const carPath = { stowX: 0, exitX: 0, floorY: 0, groundY: 0, rampStartX: 0, rampEndX: 0 };
+    let CAR_FACING = 1; // flip to -1 if the car faces the wrong way (nose should point to the rear / +X)
+
+    function loadCar(trailerBox) {
+      const mtlLoader = new MTLLoader(manager);
+      mtlLoader.setPath('assets/car/');
+      mtlLoader.load('coupe.mtl', (materials) => {
+        materials.preload();
+        const objLoader = new OBJLoader(manager);
+        objLoader.setMaterials(materials);
+        objLoader.setPath('assets/car/');
+        objLoader.load('coupe.obj', (car) => {
+          car.traverse((c) => {
+            if (c.isMesh) {
+              c.castShadow = true;
+              c.receiveShadow = true;
+              if (!c.geometry.attributes.normal) c.geometry.computeVertexNormals();
+              const conv = (m) => {
+                const s = new THREE.MeshStandardMaterial({ name: m && m.name });
+                if (m && m.map) { s.map = m.map; s.map.colorSpace = THREE.SRGBColorSpace; s.map.anisotropy = renderer.capabilities.getMaxAnisotropy(); }
+                else if (m && m.color) s.color.copy(m.color);
+                s.roughness = 0.5; s.metalness = 0.05; s.envMapIntensity = 1.0;
+                return s;
+              };
+              c.material = Array.isArray(c.material) ? c.material.map(conv) : conv(c.material);
+            }
+          });
+
+          // Raw OBJ is upright with length along Z and nose toward +Z.
+          // Turn the nose toward +X (the rear of the trailer / exit direction).
+          car.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), (Math.PI / 2) * CAR_FACING);
+          car.updateMatrixWorld(true);
+          let cb = new THREE.Box3().setFromObject(car);
+          let cs = cb.getSize(new THREE.Vector3());
+
+          // Scale so the car width fits comfortably inside the trailer
+          cb = new THREE.Box3().setFromObject(car); cs = cb.getSize(new THREE.Vector3());
+          const carWidth = Math.min(cs.x, cs.z);
+          const targetWidth = (trailerBox.max.z - trailerBox.min.z) * 0.52;
+          car.scale.setScalar(targetWidth / carWidth);
+
+          // Re-center to a center-bottom origin, wrap in a group for clean movement
+          car.updateMatrixWorld(true);
+          cb = new THREE.Box3().setFromObject(car);
+          const cc = cb.getCenter(new THREE.Vector3());
+          car.position.x -= cc.x;
+          car.position.z -= cc.z;
+          car.position.y -= cb.min.y;
+
+          carGroup = new THREE.Group();
+          carGroup.add(car);
+
+          const range = trailerBox.max.y - trailerBox.min.y;
+          carPath.floorY = trailerBox.min.y + range * 0.19;     // cargo deck height
+          carPath.groundY = 0;
+          carPath.stowX = 0.5;                                   // stowed inside (hidden when closed)
+          carPath.exitX = trailerBox.max.x + 3.0;               // behind the rear (+X)
+          carPath.rampStartX = trailerBox.max.x;                // rear edge: start descending
+          carPath.rampEndX = trailerBox.max.x + 2.0;            // reach ground here
+
+          carGroup.position.set(carPath.stowX, carPath.floorY, 0);
+          scene.add(carGroup);
+          window.__car = carGroup;
+        }, undefined, (e) => console.error('car obj load failed', e));
+      }, undefined, (e) => console.error('car mtl load failed', e));
+    }
+
+    // Maps the car's X to its Y so it descends from deck to ground like a ramp.
+    function carYForX(x) {
+      const t = THREE.MathUtils.clamp((x - carPath.rampEndX) / (carPath.rampStartX - carPath.rampEndX), 0, 1);
+      return carPath.groundY + t * (carPath.floorY - carPath.groundY);
+    }
+
+    // ---------- GSAP camera flythrough ----------
+    let orbitTween = null;       // continuous orbit
+    const orbitState = { angle: Math.PI * 0.25 };
+    let orbiting = true;
+    let userInteracting = false;
+    let cinematic = false;       // GSAP fully owns the camera during the unload sequence
+
+    const camDist = () => fitRadius * 2.6;
+    const camHeight = () => modelCenter.y + fitRadius * 0.55;
+
+    function applyOrbitAngle() {
+      if (userInteracting) return;
+      const d = camDist();
+      camera.position.x = modelCenter.x + Math.cos(orbitState.angle) * d;
+      camera.position.z = modelCenter.z + Math.sin(orbitState.angle) * d;
+      camera.position.y = camHeight();
+      camera.lookAt(modelCenter);
+    }
+
+    function startOrbit() {
+      if (orbitTween) orbitTween.kill();
+      // continuous 360° loop
+      orbitTween = gsap.to(orbitState, {
+        angle: orbitState.angle + Math.PI * 2,
+        duration: 26,
+        ease: 'none',
+        repeat: -1,
+        onUpdate: applyOrbitAngle
+      });
+    }
+
+    function setupCameraIntro() {
+      // Cinematic entrance: sweep in from a low wide angle to the orbit path.
+      const d = camDist();
+      const startAngle = orbitState.angle - Math.PI * 0.6;
+      camera.position.set(
+        modelCenter.x + Math.cos(startAngle) * d * 1.8,
+        modelCenter.y + fitRadius * 0.15,
+        modelCenter.z + Math.sin(startAngle) * d * 1.8
+      );
+      camera.lookAt(modelCenter);
+
+      const intro = { angle: startAngle, dist: d * 1.8, height: modelCenter.y + fitRadius * 0.15 };
+      gsap.timeline({
+        onUpdate: () => {
+          if (userInteracting) return;
+          camera.position.x = modelCenter.x + Math.cos(intro.angle) * intro.dist;
+          camera.position.z = modelCenter.z + Math.sin(intro.angle) * intro.dist;
+          camera.position.y = intro.height;
+          camera.lookAt(modelCenter);
+        },
+        onComplete: () => { orbitState.angle = intro.angle % (Math.PI * 2); if (orbiting) startOrbit(); }
+      })
+      .to(intro, { angle: orbitState.angle, duration: 2.6, ease: 'power2.inOut' }, 0)
+      .to(intro, { dist: camDist(), duration: 2.6, ease: 'power2.inOut' }, 0)
+      .to(intro, { height: camHeight(), duration: 2.6, ease: 'power2.out' }, 0);
+    }
+
+    // ---------- User interaction: pause orbit while dragging ----------
+    controls.addEventListener('start', () => {
+      userInteracting = true;
+      if (orbitTween) orbitTween.pause();
+      document.getElementById('hint').classList.add('gone');
+    });
+    controls.addEventListener('end', () => {
+      userInteracting = false;
+      if (orbiting) {
+        // sync orbit angle to where the user left the camera, then resume smoothly
+        const dx = camera.position.x - modelCenter.x;
+        const dz = camera.position.z - modelCenter.z;
+        orbitState.angle = Math.atan2(dz, dx);
+        startOrbit();
+      }
+    });
+
+    // ---------- Buttons ----------
+    const btnOrbit = document.getElementById('btn-orbit');
+    const orbitLabel = document.getElementById('orbit-label');
+    btnOrbit.addEventListener('click', () => {
+      orbiting = !orbiting;
+      btnOrbit.classList.toggle('active', orbiting);
+      orbitLabel.textContent = orbiting ? 'Pause orbit' : 'Resume orbit';
+      if (orbiting) { startOrbit(); } else if (orbitTween) { orbitTween.pause(); }
+    });
+
+    // ---------- Open sequence: doors swing → camera watches → car drives out ----------
+    let doorsOpen = false;
+    let busy = false;
+    const btnDoors = document.getElementById('btn-doors');
+    const doorsLabel = document.getElementById('doors-label');
+
+    // Smoothly fly the camera to a fixed viewpoint (used during the cinematic).
+    function cameraTo(pos, target, dur) {
+      return gsap.timeline()
+        .to(camera.position, { x: pos.x, y: pos.y, z: pos.z, duration: dur, ease: 'power2.inOut',
+          onUpdate: () => camera.lookAt(target.x, target.y, target.z) }, 0)
+        .to(controls.target, { x: target.x, y: target.y, z: target.z, duration: dur, ease: 'power2.inOut' }, 0);
+    }
+
+    function rearWatch() {
+      const target = new THREE.Vector3(modelCenter.x + REAR_SIGN * fitRadius * 1.05, modelCenter.y * 0.5, 0);
+      const pos = new THREE.Vector3(modelCenter.x + REAR_SIGN * fitRadius * 2.6, modelCenter.y + fitRadius * 1.0, fitRadius * 2.4);
+      return { pos, target };
+    }
+
+    btnDoors.addEventListener('click', () => {
+      if (!leftPivot || !rightPivot || busy) return;
+      doorsOpen = !doorsOpen;
+      btnDoors.classList.toggle('active', doorsOpen);
+      doorsLabel.textContent = doorsOpen ? 'Load & close' : 'Open & unload';
+      busy = true;
+      cinematic = true;
+      orbiting = false;
+      if (orbitTween) orbitTween.pause();
+
+      if (doorsOpen) {
+        const w = rearWatch();
+        const tl = gsap.timeline({ onComplete: () => { busy = false; } });
+        tl.add(cameraTo(w.pos, w.target, 1.6), 0);
+        tl.to(rightPivot.rotation, { y: OPEN_ANGLE, duration: 1.1, ease: 'power3.inOut' }, 0.4);
+        tl.to(leftPivot.rotation, { y: -OPEN_ANGLE, duration: 1.1, ease: 'power3.inOut' }, 0.48);
+        if (interiorLight) tl.to(interiorLight, { intensity: 6, duration: 1.1 }, 0.4);
+        if (carGroup) {
+          tl.to(carGroup.position, { x: carPath.exitX, duration: 3.6, ease: 'power1.inOut',
+            onUpdate: () => { carGroup.position.y = carYForX(carGroup.position.x); } }, 1.5);
+        }
+      } else {
+        const tl = gsap.timeline({ onComplete: () => {
+          busy = false; cinematic = false; orbiting = true;
+          controls.target.copy(modelCenter);
+          startOrbit();
+        } });
+        if (carGroup) {
+          tl.to(carGroup.position, { x: carPath.stowX, duration: 3.0, ease: 'power1.inOut',
+            onUpdate: () => { carGroup.position.y = carYForX(carGroup.position.x); } }, 0);
+        }
+        tl.to(rightPivot.rotation, { y: 0, duration: 1.0, ease: 'power3.inOut' }, 2.7);
+        tl.to(leftPivot.rotation, { y: 0, duration: 1.0, ease: 'power3.inOut' }, 2.78);
+        if (interiorLight) tl.to(interiorLight, { intensity: 0, duration: 1.0 }, 2.7);
+      }
+    });
+
+    document.getElementById('btn-reset').addEventListener('click', () => {
+      userInteracting = false;
+      controls.target.copy(modelCenter);
+      gsap.to(camera.position, {
+        x: modelCenter.x + Math.cos(orbitState.angle) * camDist(),
+        y: camHeight(),
+        z: modelCenter.z + Math.sin(orbitState.angle) * camDist(),
+        duration: 1.2, ease: 'power3.inOut',
+        onUpdate: () => camera.lookAt(modelCenter)
+      });
+    });
+
+    // ---------- Resize ----------
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // ---------- Render loop ----------
+    window.__cam = camera; window.__controls = controls;
+    window.__look = (ang, distMul = 2.6, hMul = 0.5) => {
+      orbiting = false; userInteracting = false;
+      const d = fitRadius * distMul;
+      camera.position.set(modelCenter.x + Math.cos(ang) * d, modelCenter.y + fitRadius * hMul, modelCenter.z + Math.sin(ang) * d);
+      camera.lookAt(modelCenter); controls.target.copy(modelCenter); controls.update();
+    };
+    function animate() {
+      requestAnimationFrame(animate);
+      // GSAP owns the camera during the automatic orbit; hand control back to
+      // OrbitControls (with damping) only while the user drags or orbit is paused.
+      if (!cinematic && (userInteracting || !orbiting)) {
+        controls.update();
+      }
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>

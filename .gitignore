@@ -1,0 +1,7 @@
+.DS_Store
+# Raw source models (redundant — the web-ready copies live in assets/)
+/3d/
+/Car/
+# stray screenshots
+/*.png
+!assets/**/*.png
