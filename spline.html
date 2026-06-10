@@ -293,7 +293,7 @@
           scene.add(model);
           overlay.classList.add('hidden');
           document.getElementById('panel').style.display = 'flex';
-          window.__model = model;
+          window.__model = model; window.__cam = camera; window.__controls = controls; window.__target = target;
           applyMaterial(); applyLights(); applyScene();
         },
         (e) => { if (e.lengthComputable) bar.style.width = Math.round(e.loaded / e.total * 100) + '%'; },
@@ -315,46 +315,93 @@
 
     const MATERIAL_SLIDER_IDS = ['mColor','mMetal','mRough','mOpac','mEnv','mCC','mCCR','mTrans','mIor','mEmis'];
 
-    // Recreated Spline editor look: frosted pastel-gradient cubes + one magenta
-    // accent cube on a lavender background. (The GLTF export bakes Spline's
-    // gradient materials to plain white, so we rebuild the look here.)
+    // Recreated Spline editor look. The GLTF bakes Spline's materials to plain
+    // white, so the look is rebuilt physically: translucent frosted glass with
+    // colored absorption (pink near the accent cube, purple further away), a
+    // glowing magenta accent cube with a point light inside so its color bleeds
+    // onto neighbours, a mirror reflection under the floor, and the editor's
+    // lavender grid backdrop.
     let splineLookReady = false;
+    let splineExtras = null, glowLight = null;
     function buildSplineLook() {
       if (splineLookReady) return;
-      const cv = document.createElement('canvas'); cv.width = cv.height = 512;
-      const ctx = cv.getContext('2d');
-      const g = ctx.createLinearGradient(0, 512, 512, 0); // diagonal: bottom-left → top-right
-      g.addColorStop(0.0, '#e9e6fb');
-      g.addColorStop(0.45, '#ffffff');
-      g.addColorStop(0.75, '#ffb8ec');
-      g.addColorStop(1.0, '#b89cff');
-      ctx.fillStyle = g; ctx.fillRect(0, 0, 512, 512);
-      const gradTex = new THREE.CanvasTexture(cv);
-      gradTex.colorSpace = THREE.SRGBColorSpace;
-      gradTex.anisotropy = maxAniso;
-
-      const frost = () => new THREE.MeshPhysicalMaterial({
-        map: gradTex, roughness: 0.42, metalness: 0,
-        clearcoat: 0.55, clearcoatRoughness: 0.35, envMapIntensity: 0.65
-      });
-      const accent = new THREE.MeshPhysicalMaterial({
-        color: '#ff2fd6', emissive: new THREE.Color('#ff2fd6'), emissiveIntensity: 0.35,
-        roughness: 0.3, metalness: 0, clearcoat: 0.6, clearcoatRoughness: 0.25, envMapIntensity: 0.7
-      });
 
       // accent = the top-front cube (largest x+y+z world center among visible cubes)
       let best = null, bestScore = -1e9;
+      const centers = new Map();
       meshEntries.forEach((e) => {
         if (!e.mesh.visible) return;
-        const b = new THREE.Box3().setFromObject(e.mesh);
-        const c = b.getCenter(new THREE.Vector3());
+        const c = new THREE.Box3().setFromObject(e.mesh).getCenter(new THREE.Vector3());
+        centers.set(e, c);
         const score = c.x + c.y + c.z;
         if (score > bestScore) { bestScore = score; best = e; }
       });
+      const accentCenter = centers.get(best) || new THREE.Vector3();
+
+      const pink = new THREE.Color('#ff4fd8'), purple = new THREE.Color('#8f78ff');
+      const frost = (atten) => new THREE.MeshPhysicalMaterial({
+        color: new THREE.Color('#ffffff').lerp(atten, 0.22), metalness: 0, roughness: 0.3,
+        transmission: 0.9, ior: 1.45, thickness: 1.5,
+        attenuationColor: atten, attenuationDistance: 0.9,
+        sheen: 1.0, sheenColor: atten, sheenRoughness: 0.5,
+        clearcoat: 1.0, clearcoatRoughness: 0.18, envMapIntensity: 0.75
+      });
+      const accent = new THREE.MeshPhysicalMaterial({
+        color: '#ff1fd0', emissive: new THREE.Color('#ff1fd0'), emissiveIntensity: 0.5,
+        metalness: 0, roughness: 0.22, transmission: 0.55, ior: 1.45, thickness: 1.1,
+        attenuationColor: new THREE.Color('#ff1fd0'), attenuationDistance: 1.2,
+        clearcoat: 1.0, clearcoatRoughness: 0.15, envMapIntensity: 0.9
+      });
+
       meshEntries.forEach((e) => {
-        const m = (e === best) ? accent : frost();
+        if (!e.mesh.visible) { e.spline = e.chrome; return; }
+        let m;
+        if (e === best) m = accent;
+        else {
+          const d = centers.get(e).distanceTo(accentCenter);
+          const t = THREE.MathUtils.clamp((d - 1.2) / 2.2, 0, 1); // near accent → pink, far → purple
+          m = frost(pink.clone().lerp(purple, t));
+        }
         e.spline = Array.isArray(e.orig) ? e.orig.map(() => m) : m;
       });
+
+      // ---- scene extras shown only in Spline-look mode ----
+      splineExtras = new THREE.Group();
+
+      // editor grid + axis lines
+      const grid = new THREE.GridHelper(60, 60, 0xb1abe4, 0xb1abe4);
+      grid.material.transparent = true; grid.material.opacity = 0.55;
+      grid.position.y = 0.002;
+      splineExtras.add(grid);
+      const axis = (x1, z1, x2, z2, color) => {
+        const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x1, 0.004, z1), new THREE.Vector3(x2, 0.004, z2)]);
+        return new THREE.Line(g, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.8 }));
+      };
+      splineExtras.add(axis(-30, 0, 30, 0, 0xff7b7b)); // X axis (red)
+      splineExtras.add(axis(0, -30, 0, 30, 0x7b9bff)); // Z axis (blue)
+
+      // magenta glow inside the accent cube → pink bleed on neighbours
+      glowLight = new THREE.PointLight(0xff2fd6, 7.0, 6.5, 1.8);
+      glowLight.position.copy(accentCenter);
+      splineExtras.add(glowLight);
+
+      // mirror reflection under the floor (cheap mirrored clones, faded)
+      const mirror = new THREE.Matrix4().makeScale(1, -1, 1);
+      meshEntries.forEach((e) => {
+        if (!e.mesh.visible) return;
+        const isAccent = e === best;
+        const rm = new THREE.Mesh(e.mesh.geometry, new THREE.MeshPhysicalMaterial({
+          color: isAccent ? '#ff2fd6' : '#dfd9f8', metalness: 0, roughness: 0.4,
+          transparent: true, opacity: isAccent ? 0.4 : 0.28, depthWrite: false
+        }));
+        e.mesh.updateWorldMatrix(true, false);
+        rm.matrix.multiplyMatrices(mirror, e.mesh.matrixWorld);
+        rm.matrixAutoUpdate = false;
+        splineExtras.add(rm);
+      });
+
+      splineExtras.visible = false;
+      scene.add(splineExtras);
       splineLookReady = true;
     }
 
@@ -362,10 +409,12 @@
       const useSpline = ctl.origMat.checked;
       if (useSpline) buildSplineLook();
       meshEntries.forEach((e) => { e.mesh.material = useSpline ? e.spline : e.chrome; });
+      if (splineExtras) splineExtras.visible = useSpline;
+      ground.material.opacity = useSpline ? 0.14 : 0.4; // softer shadow on the bright floor
       // the sliders drive the chrome set only — grey them out in Spline-look mode
       MATERIAL_SLIDER_IDS.forEach((id) => { const el = $(id); el.disabled = useSpline; el.parentElement.style.opacity = useSpline ? 0.4 : 1; });
       // lavender editor backdrop, like the Spline screenshot
-      if (useSpline) { ctl.bgMode.value = 'color'; ctl.bgColor.value = '#c8c4f2'; }
+      if (useSpline) { ctl.bgMode.value = 'color'; ctl.bgColor.value = '#c5c1f0'; }
       else { ctl.bgMode.value = 'studio'; ctl.bgColor.value = '#0b0c0f'; }
       applyScene();
     }
