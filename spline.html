@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spline Showcase</title>
+  <style>
+    :root { --accent: #ff5c2b; --text: #e9eaec; --muted: #8b8e96; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1200px 600px at 50% -10%, #2a2d33 0%, rgba(42,45,51,0) 60%),
+        linear-gradient(180deg, #0e0f12 0%, #060708 100%);
+      min-height: 100%; display: flex; flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+    .topbar { display: flex; align-items: center; justify-content: space-between; padding: 22px 30px; }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 14px var(--accent); }
+    .brand .name { font-size: 13px; letter-spacing: 0.28em; text-transform: uppercase; }
+    .back { display: inline-flex; align-items: center; gap: 8px; color: var(--text); text-decoration: none;
+      border: 1px solid rgba(255,255,255,0.14); border-radius: 999px; padding: 9px 16px;
+      font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; transition: all .2s ease; }
+    .back:hover { border-color: var(--accent); color: #fff; background: rgba(255,92,43,0.12); }
+
+    .hero { padding: 6px 30px 18px; }
+    .hero .eyebrow { font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+    .hero h1 { font-size: clamp(28px, 5vw, 56px); font-weight: 700; line-height: 1.0; letter-spacing: -0.01em; }
+    .hero p { margin-top: 10px; font-size: 14px; color: var(--muted); max-width: 560px; line-height: 1.6; }
+
+    .stage { flex: 1; display: flex; padding: 8px 30px 22px; min-height: 0; }
+    .viewer {
+      position: relative; flex: 1; min-height: 440px; border-radius: 18px; overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.10);
+      box-shadow: 0 40px 120px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.05);
+      background: radial-gradient(900px 500px at 50% 35%, #20232a 0%, #0b0c0f 70%);
+    }
+    .viewer canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; display: block; }
+
+    /* light controls */
+    .panel {
+      position: absolute; left: 18px; bottom: 18px; z-index: 5;
+      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+      padding: 12px 16px; border-radius: 14px;
+      background: rgba(12,13,16,0.6); backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.10);
+    }
+    .panel .ctrl { display: flex; flex-direction: column; gap: 5px; }
+    .panel label { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+    .panel input[type=range] { width: 130px; accent-color: var(--accent); }
+    .loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
+
+    .footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+      padding: 0 30px 22px; font-size: 12px; color: var(--muted); }
+    .footer a { color: var(--text); text-decoration: none; border-bottom: 1px solid rgba(255,255,255,0.2); }
+    .footer a:hover { color: var(--accent); border-color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="dot"></span><span class="name">3D Studio</span></div>
+    <a class="back" href="index.html">← Trailer studio</a>
+  </div>
+
+  <div class="hero">
+    <div class="eyebrow">Spline Showcase</div>
+    <h1>Spline Scene</h1>
+    <p>A Spline scene rendered with the Spline runtime. Drag to orbit — use the controls to tune the studio lighting added on top of the scene.</p>
+  </div>
+
+  <div class="stage">
+    <div class="viewer">
+      <canvas id="canvas3d"></canvas>
+      <div class="loading" id="loading">Loading scene…</div>
+      <div class="panel" id="panel" style="display:none">
+        <div class="ctrl">
+          <label>Key light</label>
+          <input type="range" id="keyLight" min="0" max="6" step="0.1" value="2.4" />
+        </div>
+        <div class="ctrl">
+          <label>Fill / ambient</label>
+          <input type="range" id="ambLight" min="0" max="4" step="0.1" value="1.0" />
+        </div>
+        <div class="ctrl">
+          <label>Rim light</label>
+          <input type="range" id="rimLight" min="0" max="6" step="0.1" value="1.4" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>Scene: <strong>box.spline</strong> · rendered with @splinetool/runtime</span>
+    <span>Studio lighting added in three.js</span>
+  </div>
+
+  <script type="module">
+    import { Application } from 'https://unpkg.com/@splinetool/runtime@1.9.48/build/runtime.js';
+
+    const canvas = document.getElementById('canvas3d');
+    const app = new Application(canvas);
+
+    await app.load('assets/box.splinecode');
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('panel').style.display = 'flex';
+    window.__spline = app;
+
+    // ---- Studio lighting added on top of the Spline scene ----
+    // We reach the runtime's internal three.js scene to boost the existing
+    // lights and add a rim light (cloned so it uses the runtime's THREE build).
+    const scene = app._scene;
+    let keyLightObj = null, ambLightObj = null, rimLightObj = null;
+    scene.traverse((o) => {
+      if (o.isDirectionalLight && !keyLightObj) keyLightObj = o;
+      if (o.isHemisphereLight && !ambLightObj) ambLightObj = o;
+    });
+    if (keyLightObj) {
+      rimLightObj = keyLightObj.clone();
+      rimLightObj.position.set(-keyLightObj.position.x, Math.abs(keyLightObj.position.y) * 0.7, -keyLightObj.position.z);
+      rimLightObj.color.set('#ffd7b0');
+      scene.add(rimLightObj);
+    }
+
+    const keyEl = document.getElementById('keyLight');
+    const ambEl = document.getElementById('ambLight');
+    const rimEl = document.getElementById('rimLight');
+
+    function applyLights() {
+      if (keyLightObj) keyLightObj.intensity = parseFloat(keyEl.value);
+      if (ambLightObj) ambLightObj.intensity = parseFloat(ambEl.value);
+      if (rimLightObj) rimLightObj.intensity = parseFloat(rimEl.value);
+      if (app.requestRender) app.requestRender();
+    }
+    keyEl.addEventListener('input', applyLights);
+    ambEl.addEventListener('input', applyLights);
+    rimEl.addEventListener('input', applyLights);
+    applyLights(); // apply the brighter studio defaults immediately
+  </script>
+</body>
+</html>

@@ -16,6 +16,13 @@ Interactive 3D studio presentation of an enclosed car-hauler trailer, built with
 - **Branding** — placeholder `VELOCITY` wordmark applied as a decal on the body and
   the rear door (swap in a real logo by replacing the canvas generator).
 
+## Pages
+
+- `index.html` — the trailer studio (above).
+- `spline.html` — a Spline scene (`box.spline`) rendered with `@splinetool/runtime`,
+  with studio key/fill/rim lights added on top of the scene via three.js, controllable
+  with live sliders. Live: https://developerscompany.github.io/Test3d/spline.html
+
 ## Run locally
 
 ```bash
