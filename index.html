@@ -159,6 +159,7 @@
     renderer.toneMappingExposure = 1.05;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.localClippingEnabled = true; // used to hide the trailer's own rear wall when doors open
     app.appendChild(renderer.domElement);
 
     // ---------- Scene ----------
@@ -349,17 +350,19 @@
     }
 
     let shellMesh = null, partitionMesh = null;
+    const trailerMaterials = [];   // all rebuilt trailer materials (for rear-wall clipping)
     fbxLoader.load('assets/trailer.fbx', (object) => {
       object.traverse((c) => {
         if (c.isMesh) {
           c.castShadow = true;
           c.receiveShadow = true;
           if (c.name === 'Base_01') shellMesh = c;   // full outer body for decal projection
-          if (c.name === 'Base_02') partitionMesh = c; // interior partition blocking the exit path
+          if (c.name === 'Base_02') partitionMesh = c; // interior partition
+          const build = (m) => { const mm = buildMaterial(m); trailerMaterials.push(mm); return mm; };
           if (Array.isArray(c.material)) {
-            c.material = c.material.map(buildMaterial);
+            c.material = c.material.map(build);
           } else if (c.material) {
-            c.material = buildMaterial(c.material);
+            c.material = build(c.material);
           }
         }
       });
@@ -407,6 +410,11 @@
 
     // ---------- Rear doors (built geometry — model ships no separate door mesh) ----------
     let leftPivot = null, rightPivot = null, interiorLight = null;
+    let rearClip = null;               // plane that removes the trailer's own rear wall when open
+    function setRearClip(on) {
+      const planes = on && rearClip ? [rearClip] : [];
+      trailerMaterials.forEach((m) => { m.clippingPlanes = planes; m.clipShadows = on; });
+    }
     const OPEN_ANGLE = 1.95;           // ~112°
     const REAR_SIGN = 1;               // +X end is the rear (the narrow tongue/hitch is on -X)
 
@@ -468,6 +476,11 @@
       interiorLight = new THREE.PointLight(0xfff0dd, 0, 8, 2);
       interiorLight.position.set(rearX - REAR_SIGN * 1.6, yMid, 0);
       scene.add(interiorLight);
+
+      // Clip plane to dissolve the trailer's own rear wall while the doors are open
+      // (keeps geometry on the interior side of clipX, removes the back wall).
+      const clipX = box.max.x - 0.12;
+      rearClip = new THREE.Plane(new THREE.Vector3(-1, 0, 0), clipX);
     }
 
     // ---------- Logo decal on the side body ----------
@@ -682,6 +695,7 @@
       if (orbitTween) orbitTween.pause();
 
       if (doorsOpen) {
+        setRearClip(true); // remove the trailer's own rear wall so we don't see a second pair of doors
         const w = rearWatch();
         const tl = gsap.timeline({ onComplete: () => { busy = false; } });
         tl.add(cameraTo(w.pos, w.target, 1.6), 0);
@@ -695,6 +709,7 @@
       } else {
         const tl = gsap.timeline({ onComplete: () => {
           busy = false; cinematic = false; orbiting = true;
+          setRearClip(false); // restore the solid rear wall once the doors are shut
           controls.target.copy(modelCenter);
           startOrbit();
         } });
