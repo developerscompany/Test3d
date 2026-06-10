@@ -99,6 +99,7 @@
       </div>
       <div class="panel" id="panel" style="display:none">
         <h4>Material</h4>
+        <div class="row"><span>Spline look</span><input type="checkbox" id="origMat" /></div>
         <div class="ctrl"><label>Color</label><input type="color" id="mColor" value="#cdd2d8" /></div>
         <div class="ctrl"><label>Metalness <b id="vMetal">1.00</b></label><input type="range" id="mMetal" min="0" max="1" step="0.01" value="1" /></div>
         <div class="ctrl"><label>Roughness <b id="vRough">0.08</b></label><input type="range" id="mRough" min="0" max="1" step="0.01" value="0.08" /></div>
@@ -246,7 +247,8 @@
     }
 
     const maxAniso = renderer.capabilities.getMaxAnisotropy();
-    const materials = []; // every model material (converted to physical) for live control
+    const materials = [];  // chrome materials (driven by the sliders)
+    const meshEntries = []; // { mesh, orig, chrome } — for the Original-look toggle
 
     // Chrome-ish defaults: reflective metal, slightly transparent.
     function toChrome(src) {
@@ -274,8 +276,17 @@
           model.traverse((c) => {
             if (c.isMesh) {
               c.castShadow = true; c.receiveShadow = true;
-              if (Array.isArray(c.material)) c.material = c.material.map((m) => { const n = toChrome(m); materials.push(n); return n; });
-              else { const n = toChrome(c.material); materials.push(n); c.material = n; }
+              const orig = c.material; // keep the Spline-exported materials for the Original-look toggle
+              (Array.isArray(orig) ? orig : [orig]).forEach((m) => {
+                if (!m) return;
+                if (m.map) m.map.anisotropy = maxAniso;
+                if ('envMapIntensity' in m) m.envMapIntensity = 1.0;
+              });
+              let chrome;
+              if (Array.isArray(orig)) { chrome = orig.map((m) => { const n = toChrome(m); materials.push(n); return n; }); }
+              else { chrome = toChrome(orig); materials.push(chrome); }
+              meshEntries.push({ mesh: c, orig, chrome });
+              c.material = chrome;
             }
           });
           frameModel(model);
@@ -299,8 +310,65 @@
       color: $('mColor'), metal: $('mMetal'), rough: $('mRough'), opac: $('mOpac'),
       env: $('mEnv'), cc: $('mCC'), ccr: $('mCCR'), trans: $('mTrans'), ior: $('mIor'), emis: $('mEmis'),
       key: $('keyL'), fill: $('fillL'), rim: $('rimL'), amb: $('ambL'), expo: $('expo'), auto: $('autoRot'),
-      envOn: $('envOn'), bgMode: $('bgMode'), bgColor: $('bgColor'), bgBlur: $('bgBlur')
+      envOn: $('envOn'), bgMode: $('bgMode'), bgColor: $('bgColor'), bgBlur: $('bgBlur'), origMat: $('origMat')
     };
+
+    const MATERIAL_SLIDER_IDS = ['mColor','mMetal','mRough','mOpac','mEnv','mCC','mCCR','mTrans','mIor','mEmis'];
+
+    // Recreated Spline editor look: frosted pastel-gradient cubes + one magenta
+    // accent cube on a lavender background. (The GLTF export bakes Spline's
+    // gradient materials to plain white, so we rebuild the look here.)
+    let splineLookReady = false;
+    function buildSplineLook() {
+      if (splineLookReady) return;
+      const cv = document.createElement('canvas'); cv.width = cv.height = 512;
+      const ctx = cv.getContext('2d');
+      const g = ctx.createLinearGradient(0, 512, 512, 0); // diagonal: bottom-left → top-right
+      g.addColorStop(0.0, '#e9e6fb');
+      g.addColorStop(0.45, '#ffffff');
+      g.addColorStop(0.75, '#ffb8ec');
+      g.addColorStop(1.0, '#b89cff');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, 512, 512);
+      const gradTex = new THREE.CanvasTexture(cv);
+      gradTex.colorSpace = THREE.SRGBColorSpace;
+      gradTex.anisotropy = maxAniso;
+
+      const frost = () => new THREE.MeshPhysicalMaterial({
+        map: gradTex, roughness: 0.42, metalness: 0,
+        clearcoat: 0.55, clearcoatRoughness: 0.35, envMapIntensity: 0.65
+      });
+      const accent = new THREE.MeshPhysicalMaterial({
+        color: '#ff2fd6', emissive: new THREE.Color('#ff2fd6'), emissiveIntensity: 0.35,
+        roughness: 0.3, metalness: 0, clearcoat: 0.6, clearcoatRoughness: 0.25, envMapIntensity: 0.7
+      });
+
+      // accent = the top-front cube (largest x+y+z world center among visible cubes)
+      let best = null, bestScore = -1e9;
+      meshEntries.forEach((e) => {
+        if (!e.mesh.visible) return;
+        const b = new THREE.Box3().setFromObject(e.mesh);
+        const c = b.getCenter(new THREE.Vector3());
+        const score = c.x + c.y + c.z;
+        if (score > bestScore) { bestScore = score; best = e; }
+      });
+      meshEntries.forEach((e) => {
+        const m = (e === best) ? accent : frost();
+        e.spline = Array.isArray(e.orig) ? e.orig.map(() => m) : m;
+      });
+      splineLookReady = true;
+    }
+
+    function applyOriginalToggle() {
+      const useSpline = ctl.origMat.checked;
+      if (useSpline) buildSplineLook();
+      meshEntries.forEach((e) => { e.mesh.material = useSpline ? e.spline : e.chrome; });
+      // the sliders drive the chrome set only — grey them out in Spline-look mode
+      MATERIAL_SLIDER_IDS.forEach((id) => { const el = $(id); el.disabled = useSpline; el.parentElement.style.opacity = useSpline ? 0.4 : 1; });
+      // lavender editor backdrop, like the Spline screenshot
+      if (useSpline) { ctl.bgMode.value = 'color'; ctl.bgColor.value = '#c8c4f2'; }
+      else { ctl.bgMode.value = 'studio'; ctl.bgColor.value = '#0b0c0f'; }
+      applyScene();
+    }
 
     function applyMaterial() {
       materials.forEach((m) => {
@@ -349,6 +417,7 @@
     ['key','fill','rim','amb','expo'].forEach(k => ctl[k].addEventListener('input', applyLights));
     ['bgColor','bgBlur'].forEach(k => ctl[k].addEventListener('input', applyScene));
     ['envOn','bgMode'].forEach(k => ctl[k].addEventListener('change', applyScene));
+    ctl.origMat.addEventListener('change', applyOriginalToggle);
     ctl.auto.addEventListener('change', () => { controls.autoRotate = ctl.auto.checked; });
 
     $('resetBtn').addEventListener('click', () => {
@@ -357,7 +426,8 @@
       for (const id in d) $(id).value = d[id];
       ctl.auto.checked = true; controls.autoRotate = true;
       ctl.envOn.checked = true; ctl.bgMode.value = 'studio'; ctl.bgColor.value = '#0b0c0f'; ctl.bgBlur.value = 0.4;
-      applyMaterial(); applyLights(); applyScene();
+      ctl.origMat.checked = false;
+      applyMaterial(); applyLights(); applyScene(); applyOriginalToggle();
     });
 
     function animate() {
