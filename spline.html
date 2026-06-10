@@ -69,7 +69,7 @@
   <div class="hero">
     <div class="eyebrow">Spline Showcase</div>
     <h1>Spline Scene</h1>
-    <p>A Spline scene rendered with the Spline runtime. Drag to orbit — use the controls to tune the studio lighting added on top of the scene.</p>
+    <p>A Spline scene rendered with the Spline runtime. Drag to orbit — use the controls to tune the brightness, contrast and saturation of the render.</p>
   </div>
 
   <div class="stage">
@@ -78,16 +78,16 @@
       <div class="loading" id="loading">Loading scene…</div>
       <div class="panel" id="panel" style="display:none">
         <div class="ctrl">
-          <label>Key light</label>
-          <input type="range" id="keyLight" min="0" max="6" step="0.1" value="2.4" />
+          <label>Brightness</label>
+          <input type="range" id="fBright" min="0.4" max="2.2" step="0.01" value="1.12" />
         </div>
         <div class="ctrl">
-          <label>Fill / ambient</label>
-          <input type="range" id="ambLight" min="0" max="4" step="0.1" value="1.0" />
+          <label>Contrast</label>
+          <input type="range" id="fContrast" min="0.7" max="1.7" step="0.01" value="1.06" />
         </div>
         <div class="ctrl">
-          <label>Rim light</label>
-          <input type="range" id="rimLight" min="0" max="6" step="0.1" value="1.4" />
+          <label>Saturation</label>
+          <input type="range" id="fSat" min="0.3" max="2.2" step="0.01" value="1.15" />
         </div>
       </div>
     </div>
@@ -95,7 +95,7 @@
 
   <div class="footer">
     <span>Scene: <strong>box.spline</strong> · rendered with @splinetool/runtime</span>
-    <span>Studio lighting added in three.js</span>
+    <span>Brightness · contrast · saturation post-process</span>
   </div>
 
   <script type="module">
@@ -109,36 +109,23 @@
     document.getElementById('panel').style.display = 'flex';
     window.__spline = app;
 
-    // ---- Studio lighting added on top of the Spline scene ----
-    // We reach the runtime's internal three.js scene to boost the existing
-    // lights and add a rim light (cloned so it uses the runtime's THREE build).
-    const scene = app._scene;
-    let keyLightObj = null, ambLightObj = null, rimLightObj = null;
-    scene.traverse((o) => {
-      if (o.isDirectionalLight && !keyLightObj) keyLightObj = o;
-      if (o.isHemisphereLight && !ambLightObj) ambLightObj = o;
-    });
-    if (keyLightObj) {
-      rimLightObj = keyLightObj.clone();
-      rimLightObj.position.set(-keyLightObj.position.x, Math.abs(keyLightObj.position.y) * 0.7, -keyLightObj.position.z);
-      rimLightObj.color.set('#ffd7b0');
-      scene.add(rimLightObj);
-    }
+    // ---- Lighting / look controls ----
+    // This scene's cubes use Spline NodeMaterials that are self-lit (emissive),
+    // so they ignore added three.js lights. To give a real, visible "lighting"
+    // control we drive a brightness/contrast/saturation filter on the rendered
+    // canvas — a post-process that always responds.
+    const bEl = document.getElementById('fBright');
+    const cEl = document.getElementById('fContrast');
+    const sEl = document.getElementById('fSat');
 
-    const keyEl = document.getElementById('keyLight');
-    const ambEl = document.getElementById('ambLight');
-    const rimEl = document.getElementById('rimLight');
-
-    function applyLights() {
-      if (keyLightObj) keyLightObj.intensity = parseFloat(keyEl.value);
-      if (ambLightObj) ambLightObj.intensity = parseFloat(ambEl.value);
-      if (rimLightObj) rimLightObj.intensity = parseFloat(rimEl.value);
-      if (app.requestRender) app.requestRender();
+    function applyLook() {
+      const f = `brightness(${bEl.value}) contrast(${cEl.value}) saturate(${sEl.value})`;
+      canvas.style.filter = f;
     }
-    keyEl.addEventListener('input', applyLights);
-    ambEl.addEventListener('input', applyLights);
-    rimEl.addEventListener('input', applyLights);
-    applyLights(); // apply the brighter studio defaults immediately
+    bEl.addEventListener('input', applyLook);
+    cEl.addEventListener('input', applyLook);
+    sEl.addEventListener('input', applyLook);
+    applyLook();
   </script>
 </body>
 </html>
