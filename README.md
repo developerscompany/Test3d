@@ -19,9 +19,11 @@ Interactive 3D studio presentation of an enclosed car-hauler trailer, built with
 ## Pages
 
 - `index.html` — the trailer studio (above).
-- `spline.html` — a Spline scene (`box.spline`) rendered with `@splinetool/runtime`,
-  with studio key/fill/rim lights added on top of the scene via three.js, controllable
-  with live sliders. Live: https://developerscompany.github.io/Test3d/spline.html
+- `spline.html` — a GLTF model (exported from Spline) rendered photorealistically in
+  three.js: HDR environment reflections (RoomEnvironment), soft shadows, ACES tone
+  mapping, supersampling, and live key/fill/rim/exposure controls. Auto-loads
+  `assets/exomech.glb` if present, else `assets/box.gltf`. Big flat backdrop planes
+  from the Spline export are auto-hidden. Live: https://developerscompany.github.io/Test3d/spline.html
 
 ## Run locally
 

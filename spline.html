@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Spline Showcase</title>
+  <title>Spline Box — Realistic Render</title>
   <style>
     :root { --accent: #ff5c2b; --text: #e9eaec; --muted: #8b8e96; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -11,13 +11,10 @@
     body {
       font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       color: var(--text);
-      background:
-        radial-gradient(1200px 600px at 50% -10%, #2a2d33 0%, rgba(42,45,51,0) 60%),
-        linear-gradient(180deg, #0e0f12 0%, #060708 100%);
-      min-height: 100%; display: flex; flex-direction: column;
-      -webkit-font-smoothing: antialiased;
+      background: linear-gradient(180deg, #0e0f12 0%, #060708 100%);
+      min-height: 100%; display: flex; flex-direction: column; -webkit-font-smoothing: antialiased;
     }
-    .topbar { display: flex; align-items: center; justify-content: space-between; padding: 22px 30px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; padding: 22px 30px; z-index: 5; }
     .brand { display: flex; align-items: center; gap: 12px; }
     .brand .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 14px var(--accent); }
     .brand .name { font-size: 13px; letter-spacing: 0.28em; text-transform: uppercase; }
@@ -26,7 +23,7 @@
       font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; transition: all .2s ease; }
     .back:hover { border-color: var(--accent); color: #fff; background: rgba(255,92,43,0.12); }
 
-    .hero { padding: 6px 30px 18px; }
+    .hero { padding: 6px 30px 18px; z-index: 5; }
     .hero .eyebrow { font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
     .hero h1 { font-size: clamp(28px, 5vw, 56px); font-weight: 700; line-height: 1.0; letter-spacing: -0.01em; }
     .hero p { margin-top: 10px; font-size: 14px; color: var(--muted); max-width: 560px; line-height: 1.6; }
@@ -36,23 +33,25 @@
       position: relative; flex: 1; min-height: 440px; border-radius: 18px; overflow: hidden;
       border: 1px solid rgba(255,255,255,0.10);
       box-shadow: 0 40px 120px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.05);
-      background: radial-gradient(900px 500px at 50% 35%, #20232a 0%, #0b0c0f 70%);
+      background: radial-gradient(900px 520px at 50% 32%, #2a2e36 0%, #0b0c0f 72%);
     }
-    .viewer canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; display: block; }
+    .viewer canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
 
-    /* light controls */
-    .panel {
-      position: absolute; left: 18px; bottom: 18px; z-index: 5;
-      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-      padding: 12px 16px; border-radius: 14px;
-      background: rgba(12,13,16,0.6); backdrop-filter: blur(10px);
-      border: 1px solid rgba(255,255,255,0.10);
-    }
+    .panel { position: absolute; left: 18px; bottom: 18px; z-index: 5; display: flex; gap: 14px; flex-wrap: wrap;
+      padding: 12px 16px; border-radius: 14px; background: rgba(12,13,16,0.6); backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.10); }
     .panel .ctrl { display: flex; flex-direction: column; gap: 5px; }
     .panel label { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
-    .panel input[type=range] { width: 130px; accent-color: var(--accent); }
-    .loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-      font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
+    .panel input[type=range] { width: 120px; accent-color: var(--accent); }
+
+    .overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 30px; }
+    .overlay .card { max-width: 520px; }
+    .overlay .big { font-size: 13px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
+    .overlay .msg { margin-top: 14px; font-size: 14px; color: var(--text); line-height: 1.7; }
+    .overlay code { background: rgba(255,255,255,0.08); padding: 2px 7px; border-radius: 6px; font-size: 13px; color: #fff; }
+    .overlay.hidden { display: none; }
+    .bar { width: 220px; height: 2px; margin: 18px auto 0; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+    .bar > i { display: block; height: 100%; width: 0%; background: var(--accent); transition: width .2s ease; }
 
     .footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
       padding: 0 30px 22px; font-size: 12px; color: var(--muted); }
@@ -67,65 +66,181 @@
   </div>
 
   <div class="hero">
-    <div class="eyebrow">Spline Showcase</div>
-    <h1>Spline Scene</h1>
-    <p>A Spline scene rendered with the Spline runtime. Drag to orbit — use the controls to tune the brightness, contrast and saturation of the render.</p>
+    <div class="eyebrow">Realistic Render</div>
+    <h1>Spline Box</h1>
+    <p>A GLTF model rendered in three.js with HDR environment reflections, soft shadows, ACES tone mapping and supersampling. Drag to orbit; tune the studio lights below.</p>
   </div>
 
   <div class="stage">
-    <div class="viewer">
-      <canvas id="canvas3d"></canvas>
-      <div class="loading" id="loading">Loading scene…</div>
+    <div class="viewer" id="viewer">
+      <div class="overlay" id="overlay">
+        <div class="card">
+          <div class="big">Waiting for model</div>
+          <div class="msg" id="msg">
+            Drop the EXOMECH model into the project as <code>assets/exomech.glb</code>
+            (in Spline: Remix → File → Export → GLTF/GLB). A <code>.gltf</code> + textures folder works too — just tell me the filename.
+          </div>
+          <div class="bar"><i id="bar"></i></div>
+        </div>
+      </div>
       <div class="panel" id="panel" style="display:none">
-        <div class="ctrl">
-          <label>Brightness</label>
-          <input type="range" id="fBright" min="0.4" max="2.2" step="0.01" value="1.12" />
-        </div>
-        <div class="ctrl">
-          <label>Contrast</label>
-          <input type="range" id="fContrast" min="0.7" max="1.7" step="0.01" value="1.06" />
-        </div>
-        <div class="ctrl">
-          <label>Saturation</label>
-          <input type="range" id="fSat" min="0.3" max="2.2" step="0.01" value="1.15" />
-        </div>
+        <div class="ctrl"><label>Key light</label><input type="range" id="keyL" min="0" max="6" step="0.05" value="2.6" /></div>
+        <div class="ctrl"><label>Fill</label><input type="range" id="fillL" min="0" max="4" step="0.05" value="0.8" /></div>
+        <div class="ctrl"><label>Rim</label><input type="range" id="rimL" min="0" max="6" step="0.05" value="1.6" /></div>
+        <div class="ctrl"><label>Exposure</label><input type="range" id="expo" min="0.4" max="2" step="0.01" value="1.0" /></div>
       </div>
     </div>
   </div>
 
   <div class="footer">
-    <span>Scene: <strong>box.spline</strong> · rendered with @splinetool/runtime</span>
-    <span>Brightness · contrast · saturation post-process</span>
+    <span id="credit">Model: box.gltf · rendered in three.js</span>
+    <span>HDR env · soft shadows · ACES</span>
   </div>
 
-  <script type="module">
-    import { Application } from 'https://unpkg.com/@splinetool/runtime@1.9.48/build/runtime.js';
-
-    const canvas = document.getElementById('canvas3d');
-    const app = new Application(canvas);
-
-    await app.load('assets/box.splinecode');
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('panel').style.display = 'flex';
-    window.__spline = app;
-
-    // ---- Lighting / look controls ----
-    // This scene's cubes use Spline NodeMaterials that are self-lit (emissive),
-    // so they ignore added three.js lights. To give a real, visible "lighting"
-    // control we drive a brightness/contrast/saturation filter on the rendered
-    // canvas — a post-process that always responds.
-    const bEl = document.getElementById('fBright');
-    const cEl = document.getElementById('fContrast');
-    const sEl = document.getElementById('fSat');
-
-    function applyLook() {
-      const f = `brightness(${bEl.value}) contrast(${cEl.value}) saturate(${sEl.value})`;
-      canvas.style.filter = f;
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
     }
-    bEl.addEventListener('input', applyLook);
-    cEl.addEventListener('input', applyLook);
-    sEl.addEventListener('input', applyLook);
-    applyLook();
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+    const MODEL_CANDIDATES = ['assets/exomech.glb', 'assets/exomech.gltf', 'assets/box.gltf', 'assets/box.glb'];
+
+    const viewerEl = document.getElementById('viewer');
+    const overlay = document.getElementById('overlay');
+    const msg = document.getElementById('msg');
+    const bar = document.getElementById('bar');
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio * 1.5, 2.5)); // supersample for crisp detail
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    viewerEl.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+    const camera = new THREE.PerspectiveCamera(38, 1, 0.01, 5000);
+    camera.position.set(4, 2.5, 6);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 1.2;
+    controls.maxPolarAngle = Math.PI * 0.54;
+
+    // Lights (work on PBR materials)
+    const key = new THREE.DirectionalLight(0xffffff, 2.6);
+    key.position.set(6, 9, 5); key.castShadow = true;
+    key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0002;
+    const sc = key.shadow.camera; sc.near = 0.1; sc.far = 60; sc.left = -10; sc.right = 10; sc.top = 10; sc.bottom = -10;
+    scene.add(key);
+    const fill = new THREE.DirectionalLight(0xbcd3ff, 0.8); fill.position.set(-8, 4, -3); scene.add(fill);
+    const rim = new THREE.DirectionalLight(0xffd9b0, 1.6); rim.position.set(-4, 6, -8); scene.add(rim);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x2a2d33, 0.5));
+
+    // Shadow-catcher ground
+    const ground = new THREE.Mesh(new THREE.CircleGeometry(40, 64), new THREE.ShadowMaterial({ opacity: 0.4 }));
+    ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+
+    function resize() {
+      const w = viewerEl.clientWidth, h = viewerEl.clientHeight;
+      renderer.setSize(w, h); // updateStyle=true so the canvas fills the viewer
+      camera.aspect = w / h; camera.updateProjectionMatrix();
+    }
+    window.addEventListener('resize', resize); resize();
+
+    let target = new THREE.Vector3();
+    // Bounding box from the real geometry only (visible, non-backdrop meshes).
+    function computeFitBox(obj) {
+      obj.updateWorldMatrix(true, true);
+      const box = new THREE.Box3(); let any = false;
+      obj.traverse((o) => {
+        if (o.isMesh && o.visible) { box.union(new THREE.Box3().setFromObject(o)); any = true; }
+      });
+      return any ? box : new THREE.Box3().setFromObject(obj);
+    }
+    function frameModel(obj) {
+      // Hide big flat backdrop planes that Spline exports (e.g. "Rectangle").
+      obj.traverse((o) => {
+        if (!o.isMesh) return;
+        o.geometry.computeBoundingBox();
+        const bb = o.geometry.boundingBox;
+        const dx = bb.max.x - bb.min.x, dy = bb.max.y - bb.min.y, dz = bb.max.z - bb.min.z;
+        const mn = Math.min(dx, dy, dz), mx = Math.max(dx, dy, dz);
+        if (mn < mx * 0.02 && mx > 200) o.visible = false; // huge flat plane → backdrop
+      });
+
+      let box = computeFitBox(obj);
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z) || 1;
+      obj.scale.setScalar(4 / maxDim);
+
+      box = computeFitBox(obj);
+      const c = box.getCenter(new THREE.Vector3());
+      obj.position.x -= c.x; obj.position.z -= c.z; obj.position.y -= box.min.y;
+
+      box = computeFitBox(obj);
+      box.getCenter(target);
+      const r = box.getBoundingSphere(new THREE.Sphere()).radius;
+      controls.target.copy(target);
+      camera.position.set(target.x + r * 1.7, target.y + r * 0.85, target.z + r * 2.3);
+      controls.update();
+    }
+
+    const loader = new GLTFLoader();
+    function tryLoad(i) {
+      if (i >= MODEL_CANDIDATES.length) { msg.innerHTML = msg.innerHTML; return; }
+      loader.load(MODEL_CANDIDATES[i],
+        (gltf) => {
+          const model = gltf.scene;
+          model.traverse((c) => {
+            if (c.isMesh) {
+              c.castShadow = true; c.receiveShadow = true;
+              const mats = Array.isArray(c.material) ? c.material : [c.material];
+              mats.forEach((m) => { if (m) { m.envMapIntensity = 1.1; if (m.map) m.map.anisotropy = renderer.capabilities.getMaxAnisotropy(); } });
+            }
+          });
+          frameModel(model);
+          scene.add(model);
+          overlay.classList.add('hidden');
+          document.getElementById('panel').style.display = 'flex';
+          window.__model = model;
+        },
+        (e) => { if (e.lengthComputable) bar.style.width = Math.round(e.loaded / e.total * 100) + '%'; },
+        () => tryLoad(i + 1) // try next candidate on error
+      );
+    }
+    tryLoad(0);
+
+    // Light controls
+    const keyEl = document.getElementById('keyL'), fillEl = document.getElementById('fillL'),
+          rimEl = document.getElementById('rimL'), expoEl = document.getElementById('expo');
+    function applyLights() {
+      key.intensity = +keyEl.value; fill.intensity = +fillEl.value;
+      rim.intensity = +rimEl.value; renderer.toneMappingExposure = +expoEl.value;
+    }
+    [keyEl, fillEl, rimEl, expoEl].forEach(el => el.addEventListener('input', applyLights));
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
   </script>
 </body>
 </html>
