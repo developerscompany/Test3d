@@ -37,12 +37,23 @@
     }
     .viewer canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
 
-    .panel { position: absolute; left: 18px; bottom: 18px; z-index: 5; display: flex; gap: 14px; flex-wrap: wrap;
-      padding: 12px 16px; border-radius: 14px; background: rgba(12,13,16,0.6); backdrop-filter: blur(10px);
+    .panel { position: absolute; right: 16px; top: 16px; bottom: 16px; z-index: 5; width: 216px;
+      overflow-y: auto; display: flex; flex-direction: column; gap: 11px;
+      padding: 14px 15px; border-radius: 14px; background: rgba(12,13,16,0.62); backdrop-filter: blur(12px);
       border: 1px solid rgba(255,255,255,0.10); }
-    .panel .ctrl { display: flex; flex-direction: column; gap: 5px; }
-    .panel label { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
-    .panel input[type=range] { width: 120px; accent-color: var(--accent); }
+    .panel::-webkit-scrollbar { width: 6px; } .panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+    .panel h4 { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); margin: 6px 0 0; }
+    .panel h4:first-child { margin-top: 0; }
+    .panel .ctrl { display: flex; flex-direction: column; gap: 4px; }
+    .panel label { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+      display: flex; justify-content: space-between; align-items: baseline; }
+    .panel label b { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; }
+    .panel input[type=range] { width: 100%; accent-color: var(--accent); }
+    .panel input[type=color] { width: 100%; height: 26px; padding: 0; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; background: none; cursor: pointer; }
+    .panel .row { display: flex; align-items: center; justify-content: space-between; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+    .panel .reset { margin-top: 4px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); color: var(--text);
+      font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; padding: 8px; border-radius: 8px; cursor: pointer; }
+    .panel .reset:hover { border-color: var(--accent); color: var(--accent); }
 
     .overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 30px; }
     .overlay .card { max-width: 520px; }
@@ -84,10 +95,27 @@
         </div>
       </div>
       <div class="panel" id="panel" style="display:none">
-        <div class="ctrl"><label>Key light</label><input type="range" id="keyL" min="0" max="6" step="0.05" value="2.6" /></div>
-        <div class="ctrl"><label>Fill</label><input type="range" id="fillL" min="0" max="4" step="0.05" value="0.8" /></div>
-        <div class="ctrl"><label>Rim</label><input type="range" id="rimL" min="0" max="6" step="0.05" value="1.6" /></div>
-        <div class="ctrl"><label>Exposure</label><input type="range" id="expo" min="0.4" max="2" step="0.01" value="1.0" /></div>
+        <h4>Material</h4>
+        <div class="ctrl"><label>Color</label><input type="color" id="mColor" value="#cdd2d8" /></div>
+        <div class="ctrl"><label>Metalness <b id="vMetal">1.00</b></label><input type="range" id="mMetal" min="0" max="1" step="0.01" value="1" /></div>
+        <div class="ctrl"><label>Roughness <b id="vRough">0.08</b></label><input type="range" id="mRough" min="0" max="1" step="0.01" value="0.08" /></div>
+        <div class="ctrl"><label>Opacity <b id="vOpac">0.82</b></label><input type="range" id="mOpac" min="0.05" max="1" step="0.01" value="0.82" /></div>
+        <div class="ctrl"><label>Reflections <b id="vEnv">2.00</b></label><input type="range" id="mEnv" min="0" max="3" step="0.05" value="2.0" /></div>
+        <div class="ctrl"><label>Clearcoat <b id="vCC">0.00</b></label><input type="range" id="mCC" min="0" max="1" step="0.01" value="0" /></div>
+        <div class="ctrl"><label>Coat rough <b id="vCCR">0.10</b></label><input type="range" id="mCCR" min="0" max="1" step="0.01" value="0.1" /></div>
+        <div class="ctrl"><label>Transmission <b id="vTrans">0.00</b></label><input type="range" id="mTrans" min="0" max="1" step="0.01" value="0" /></div>
+        <div class="ctrl"><label>IOR <b id="vIor">1.50</b></label><input type="range" id="mIor" min="1" max="2.33" step="0.01" value="1.5" /></div>
+        <div class="ctrl"><label>Emissive <b id="vEmis">0.00</b></label><input type="range" id="mEmis" min="0" max="3" step="0.05" value="0" /></div>
+
+        <h4>Lighting</h4>
+        <div class="ctrl"><label>Key <b id="vKey">2.60</b></label><input type="range" id="keyL" min="0" max="8" step="0.05" value="2.6" /></div>
+        <div class="ctrl"><label>Fill <b id="vFill">0.80</b></label><input type="range" id="fillL" min="0" max="5" step="0.05" value="0.8" /></div>
+        <div class="ctrl"><label>Rim <b id="vRim">1.60</b></label><input type="range" id="rimL" min="0" max="8" step="0.05" value="1.6" /></div>
+        <div class="ctrl"><label>Ambient <b id="vAmb">0.50</b></label><input type="range" id="ambL" min="0" max="3" step="0.05" value="0.5" /></div>
+        <div class="ctrl"><label>Exposure <b id="vExpo">1.20</b></label><input type="range" id="expo" min="0.2" max="2" step="0.01" value="1.2" /></div>
+
+        <div class="row"><span>Auto-rotate</span><input type="checkbox" id="autoRot" checked /></div>
+        <button class="reset" id="resetBtn">Reset</button>
       </div>
     </div>
   </div>
@@ -150,7 +178,7 @@
     scene.add(key);
     const fill = new THREE.DirectionalLight(0xbcd3ff, 0.8); fill.position.set(-8, 4, -3); scene.add(fill);
     const rim = new THREE.DirectionalLight(0xffd9b0, 1.6); rim.position.set(-4, 6, -8); scene.add(rim);
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x2a2d33, 0.5));
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x2a2d33, 0.5); scene.add(hemi);
 
     // Shadow-catcher ground
     const ground = new THREE.Mesh(new THREE.CircleGeometry(40, 64), new THREE.ShadowMaterial({ opacity: 0.4 }));
@@ -201,17 +229,37 @@
       controls.update();
     }
 
+    const maxAniso = renderer.capabilities.getMaxAnisotropy();
+    const materials = []; // every model material (converted to physical) for live control
+
+    // Chrome-ish defaults: reflective metal, slightly transparent.
+    function toChrome(src) {
+      const p = new THREE.MeshPhysicalMaterial();
+      if (src) {
+        if (src.map) { p.map = src.map; p.map.anisotropy = maxAniso; }
+        if (src.normalMap) p.normalMap = src.normalMap;
+      }
+      p.color.set('#cdd2d8');
+      p.metalness = 1.0; p.roughness = 0.08; p.envMapIntensity = 1.6;
+      p.transparent = true; p.opacity = 0.82;
+      p.clearcoat = 0.0; p.clearcoatRoughness = 0.1;
+      p.transmission = 0.0; p.ior = 1.5; p.thickness = 0.5;
+      p.emissive = new THREE.Color('#cdd2d8'); p.emissiveIntensity = 0.0;
+      p.needsUpdate = true;
+      return p;
+    }
+
     const loader = new GLTFLoader();
     function tryLoad(i) {
-      if (i >= MODEL_CANDIDATES.length) { msg.innerHTML = msg.innerHTML; return; }
+      if (i >= MODEL_CANDIDATES.length) return;
       loader.load(MODEL_CANDIDATES[i],
         (gltf) => {
           const model = gltf.scene;
           model.traverse((c) => {
             if (c.isMesh) {
               c.castShadow = true; c.receiveShadow = true;
-              const mats = Array.isArray(c.material) ? c.material : [c.material];
-              mats.forEach((m) => { if (m) { m.envMapIntensity = 1.1; if (m.map) m.map.anisotropy = renderer.capabilities.getMaxAnisotropy(); } });
+              if (Array.isArray(c.material)) c.material = c.material.map((m) => { const n = toChrome(m); materials.push(n); return n; });
+              else { const n = toChrome(c.material); materials.push(n); c.material = n; }
             }
           });
           frameModel(model);
@@ -219,6 +267,7 @@
           overlay.classList.add('hidden');
           document.getElementById('panel').style.display = 'flex';
           window.__model = model;
+          applyMaterial(); applyLights();
         },
         (e) => { if (e.lengthComputable) bar.style.width = Math.round(e.loaded / e.total * 100) + '%'; },
         () => tryLoad(i + 1) // try next candidate on error
@@ -226,14 +275,55 @@
     }
     tryLoad(0);
 
-    // Light controls
-    const keyEl = document.getElementById('keyL'), fillEl = document.getElementById('fillL'),
-          rimEl = document.getElementById('rimL'), expoEl = document.getElementById('expo');
-    function applyLights() {
-      key.intensity = +keyEl.value; fill.intensity = +fillEl.value;
-      rim.intensity = +rimEl.value; renderer.toneMappingExposure = +expoEl.value;
+    // ---- Controls (material + lighting) ----
+    const $ = (id) => document.getElementById(id);
+    const fmt = (v, d = 2) => (+v).toFixed(d);
+
+    const ctl = {
+      color: $('mColor'), metal: $('mMetal'), rough: $('mRough'), opac: $('mOpac'),
+      env: $('mEnv'), cc: $('mCC'), ccr: $('mCCR'), trans: $('mTrans'), ior: $('mIor'), emis: $('mEmis'),
+      key: $('keyL'), fill: $('fillL'), rim: $('rimL'), amb: $('ambL'), expo: $('expo'), auto: $('autoRot')
+    };
+
+    function applyMaterial() {
+      materials.forEach((m) => {
+        m.color.set(ctl.color.value);
+        m.metalness = +ctl.metal.value;
+        m.roughness = +ctl.rough.value;
+        m.opacity = +ctl.opac.value; m.transparent = m.opacity < 1;
+        m.envMapIntensity = +ctl.env.value;
+        m.clearcoat = +ctl.cc.value;
+        m.clearcoatRoughness = +ctl.ccr.value;
+        m.transmission = +ctl.trans.value;
+        m.ior = +ctl.ior.value;
+        m.emissive.set(ctl.color.value);
+        m.emissiveIntensity = +ctl.emis.value;
+      });
+      $('vMetal').textContent = fmt(ctl.metal.value); $('vRough').textContent = fmt(ctl.rough.value);
+      $('vOpac').textContent = fmt(ctl.opac.value); $('vEnv').textContent = fmt(ctl.env.value);
+      $('vCC').textContent = fmt(ctl.cc.value); $('vCCR').textContent = fmt(ctl.ccr.value);
+      $('vTrans').textContent = fmt(ctl.trans.value); $('vIor').textContent = fmt(ctl.ior.value);
+      $('vEmis').textContent = fmt(ctl.emis.value);
     }
-    [keyEl, fillEl, rimEl, expoEl].forEach(el => el.addEventListener('input', applyLights));
+    function applyLights() {
+      key.intensity = +ctl.key.value; fill.intensity = +ctl.fill.value;
+      rim.intensity = +ctl.rim.value; hemi.intensity = +ctl.amb.value;
+      renderer.toneMappingExposure = +ctl.expo.value;
+      $('vKey').textContent = fmt(ctl.key.value); $('vFill').textContent = fmt(ctl.fill.value);
+      $('vRim').textContent = fmt(ctl.rim.value); $('vAmb').textContent = fmt(ctl.amb.value);
+      $('vExpo').textContent = fmt(ctl.expo.value);
+    }
+    ['color','metal','rough','opac','env','cc','ccr','trans','ior','emis'].forEach(k => ctl[k].addEventListener('input', applyMaterial));
+    ['key','fill','rim','amb','expo'].forEach(k => ctl[k].addEventListener('input', applyLights));
+    ctl.auto.addEventListener('change', () => { controls.autoRotate = ctl.auto.checked; });
+
+    $('resetBtn').addEventListener('click', () => {
+      const d = { mColor:'#cdd2d8', mMetal:1, mRough:0.08, mOpac:0.82, mEnv:2.0, mCC:0, mCCR:0.1, mTrans:0, mIor:1.5, mEmis:0,
+        keyL:2.6, fillL:0.8, rimL:1.6, ambL:0.5, expo:1.2 };
+      for (const id in d) $(id).value = d[id];
+      ctl.auto.checked = true; controls.autoRotate = true;
+      applyMaterial(); applyLights();
+    });
 
     function animate() {
       requestAnimationFrame(animate);
