@@ -50,6 +50,9 @@
     .panel label b { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; }
     .panel input[type=range] { width: 100%; accent-color: var(--accent); }
     .panel input[type=color] { width: 100%; height: 26px; padding: 0; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; background: none; cursor: pointer; }
+    .panel select { width: 100%; padding: 6px 8px; border-radius: 6px; background: rgba(255,255,255,0.06); color: var(--text);
+      border: 1px solid rgba(255,255,255,0.15); font-size: 11px; cursor: pointer; }
+    .panel input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
     .panel .row { display: flex; align-items: center; justify-content: space-between; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
     .panel .reset { margin-top: 4px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); color: var(--text);
       font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; padding: 8px; border-radius: 8px; cursor: pointer; }
@@ -114,6 +117,18 @@
         <div class="ctrl"><label>Ambient <b id="vAmb">0.50</b></label><input type="range" id="ambL" min="0" max="3" step="0.05" value="0.5" /></div>
         <div class="ctrl"><label>Exposure <b id="vExpo">1.20</b></label><input type="range" id="expo" min="0.2" max="2" step="0.01" value="1.2" /></div>
 
+        <h4>Scene</h4>
+        <div class="row"><span>Environment</span><input type="checkbox" id="envOn" checked /></div>
+        <div class="ctrl"><label>Background</label>
+          <select id="bgMode">
+            <option value="studio">Studio (default)</option>
+            <option value="color">Solid color</option>
+            <option value="env">Environment</option>
+          </select>
+        </div>
+        <div class="ctrl"><label>BG color</label><input type="color" id="bgColor" value="#0b0c0f" /></div>
+        <div class="ctrl"><label>BG blur <b id="vBlur">0.40</b></label><input type="range" id="bgBlur" min="0" max="1" step="0.01" value="0.4" /></div>
+
         <div class="row"><span>Auto-rotate</span><input type="checkbox" id="autoRot" checked /></div>
         <button class="reset" id="resetBtn">Reset</button>
       </div>
@@ -158,7 +173,8 @@
 
     const scene = new THREE.Scene();
     const pmrem = new THREE.PMREMGenerator(renderer);
-    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environment = envTex;
 
     const camera = new THREE.PerspectiveCamera(38, 1, 0.01, 5000);
     camera.position.set(4, 2.5, 6);
@@ -267,7 +283,7 @@
           overlay.classList.add('hidden');
           document.getElementById('panel').style.display = 'flex';
           window.__model = model;
-          applyMaterial(); applyLights();
+          applyMaterial(); applyLights(); applyScene();
         },
         (e) => { if (e.lengthComputable) bar.style.width = Math.round(e.loaded / e.total * 100) + '%'; },
         () => tryLoad(i + 1) // try next candidate on error
@@ -282,7 +298,8 @@
     const ctl = {
       color: $('mColor'), metal: $('mMetal'), rough: $('mRough'), opac: $('mOpac'),
       env: $('mEnv'), cc: $('mCC'), ccr: $('mCCR'), trans: $('mTrans'), ior: $('mIor'), emis: $('mEmis'),
-      key: $('keyL'), fill: $('fillL'), rim: $('rimL'), amb: $('ambL'), expo: $('expo'), auto: $('autoRot')
+      key: $('keyL'), fill: $('fillL'), rim: $('rimL'), amb: $('ambL'), expo: $('expo'), auto: $('autoRot'),
+      envOn: $('envOn'), bgMode: $('bgMode'), bgColor: $('bgColor'), bgBlur: $('bgBlur')
     };
 
     function applyMaterial() {
@@ -313,8 +330,25 @@
       $('vRim').textContent = fmt(ctl.rim.value); $('vAmb').textContent = fmt(ctl.amb.value);
       $('vExpo').textContent = fmt(ctl.expo.value);
     }
+    function applyScene() {
+      scene.environment = ctl.envOn.checked ? envTex : null;
+      const mode = ctl.bgMode.value;
+      if (mode === 'color') {
+        scene.background = new THREE.Color(ctl.bgColor.value);
+      } else if (mode === 'env') {
+        scene.background = envTex;
+        scene.backgroundBlurriness = +ctl.bgBlur.value;
+      } else { // studio: transparent canvas → CSS gradient shows
+        scene.background = null;
+      }
+      $('vBlur').textContent = fmt(ctl.bgBlur.value);
+      // materials must recompile when the environment is toggled
+      materials.forEach((m) => { m.needsUpdate = true; });
+    }
     ['color','metal','rough','opac','env','cc','ccr','trans','ior','emis'].forEach(k => ctl[k].addEventListener('input', applyMaterial));
     ['key','fill','rim','amb','expo'].forEach(k => ctl[k].addEventListener('input', applyLights));
+    ['bgColor','bgBlur'].forEach(k => ctl[k].addEventListener('input', applyScene));
+    ['envOn','bgMode'].forEach(k => ctl[k].addEventListener('change', applyScene));
     ctl.auto.addEventListener('change', () => { controls.autoRotate = ctl.auto.checked; });
 
     $('resetBtn').addEventListener('click', () => {
@@ -322,7 +356,8 @@
         keyL:2.6, fillL:0.8, rimL:1.6, ambL:0.5, expo:1.2 };
       for (const id in d) $(id).value = d[id];
       ctl.auto.checked = true; controls.autoRotate = true;
-      applyMaterial(); applyLights();
+      ctl.envOn.checked = true; ctl.bgMode.value = 'studio'; ctl.bgColor.value = '#0b0c0f'; ctl.bgBlur.value = 0.4;
+      applyMaterial(); applyLights(); applyScene();
     });
 
     function animate() {
